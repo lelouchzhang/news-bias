@@ -1,4 +1,5 @@
 import { Menu } from "lucide-react";
+import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +57,14 @@ export function Header() {
 
         <div className="ml-auto flex items-center gap-3">
           <Button className="hidden sm:inline-flex">Subscribe</Button>
-          <Button variant="secondary">Login</Button>
+          <Show when="signed-out">
+            <SignInButton mode="redirect">
+              <Button variant="secondary">Login</Button>
+            </SignInButton>
+          </Show>
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
         </div>
       </div>
     </header>
