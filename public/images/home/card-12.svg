@@ -1,0 +1,8 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+  <rect width="800" height="450" fill="#e8e8e8"/>
+  <rect x="0" y="0" width="800" height="450" fill="none" stroke="#d9d9d9" stroke-width="1"/>
+  <circle cx="400" cy="205" r="34" fill="#d5d5d5" stroke="#c0c0c0" stroke-width="2"/>
+  <rect x="360" y="248" width="80" height="8" rx="4" fill="#d5d5d5"/>
+  <text x="400" y="300" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="28" font-weight="600" fill="#9a9a9a">Environment · Canada</text>
+  <text x="400" y="330" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="15" fill="#b0b0b0">Image placeholder</text>
+</svg>
