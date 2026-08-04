@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <rect width="1200" height="675" fill="#e8e8e8"/>
+  <rect x="0" y="0" width="1200" height="675" fill="none" stroke="#d9d9d9" stroke-width="1"/>
+  <circle cx="600" cy="300" r="70" fill="#d5d5d5" stroke="#c0c0c0" stroke-width="3"/>
+  <rect x="520" y="390" width="160" height="14" rx="7" fill="#d5d5d5"/>
+  <text x="600" y="470" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="34" font-weight="600" fill="#9a9a9a">Politics · United States</text>
+  <text x="600" y="510" text-anchor="middle" font-family="Poppins, Arial, sans-serif" font-size="18" fill="#b0b0b0">Image placeholder</text>
+</svg>
