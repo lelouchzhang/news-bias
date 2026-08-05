@@ -4,11 +4,11 @@ import { cn } from "@/lib/utils";
 import {
   biasLabelDisplay,
   biasLabelTextClass,
-  type BiasAnalysis,
-} from "@/lib/article/mock-article-details";
+  type BiasAnalysisView,
+} from "@/lib/article/types";
 
 interface BiasAnalysisCardProps {
-  analysis: BiasAnalysis;
+  analysis: BiasAnalysisView;
 }
 
 const barRows = [
@@ -18,7 +18,7 @@ const barRows = [
 ] as const;
 
 export function BiasAnalysisCard({ analysis }: BiasAnalysisCardProps) {
-  const { left, center, right } = analysis.distribution;
+  const { left, center, right } = analysis;
   const overallPercent = Math.max(left, center, right);
 
   return (
@@ -40,13 +40,14 @@ export function BiasAnalysisCard({ analysis }: BiasAnalysisCardProps) {
       <p
         className={cn(
           "mt-1 text-3xl font-bold",
-          biasLabelTextClass[analysis.overallLabel],
+          biasLabelTextClass[analysis.biasLabel],
         )}
       >
-        {biasLabelDisplay[analysis.overallLabel]} {overallPercent}%
+        {biasLabelDisplay[analysis.biasLabel]} {overallPercent}%
       </p>
-      <p className="mt-1 text-body-sm text-right-bias">
-        {analysis.basedOn}
+      <p className="mt-1 text-body-sm text-text-secondary">
+        {Math.round(analysis.confidence * 100)}% confidence · Sentiment:{" "}
+        {analysis.sentimentLabel}
       </p>
 
       <div className="mt-4">
@@ -59,9 +60,7 @@ export function BiasAnalysisCard({ analysis }: BiasAnalysisCardProps) {
             <div
               key={row.label}
               className={row.barClass}
-              style={{
-                width: `${[left, center, right][index]}%`,
-              }}
+              style={{ width: `${[left, center, right][index]}%` }}
             />
           ))}
         </div>
@@ -75,7 +74,7 @@ export function BiasAnalysisCard({ analysis }: BiasAnalysisCardProps) {
       </div>
 
       <p className="mt-4 text-body-sm text-text-secondary">
-        {analysis.note}
+        {analysis.framingNotes}
       </p>
 
       <Button variant="secondary" className="mt-4 w-full">
