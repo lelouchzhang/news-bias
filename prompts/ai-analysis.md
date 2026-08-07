@@ -55,6 +55,7 @@
 ## 5. 可能更改的文件
 
 新增：
+
 - `lib/ai/constants.ts` — 集中限值：`DEFAULT_ANALYSIS_MODEL = "qwen3.7-plus"`、`DEFAULT_ANALYSIS_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"`、`ANALYSIS_MAX_CHARS = 8000`、`ANALYSIS_RETRY_LIMIT = 1`、默认批次/超时等
 - `lib/ai/types.ts` — `AnalysisResult`（已校验输出）、`PendingArticle`、`AnalysisRunSummary` 等
 - `lib/ai/schema.ts` — Zod 分析输出 schema（§19 全部字段 + refine）
@@ -64,6 +65,7 @@
 - `app/api/analyze/route.ts` — `POST /api/analyze`
 
 修改：
+
 - `package.json` / `package-lock.json` — 安装 `ai`、`@ai-sdk/openai-compatible`（锁定版本并提交 lockfile）
 - `.env.example` — 环境变量替换
 - `AGENTS.md` — §6 / §19 / §21 相关部分（见决策 11）
@@ -83,6 +85,7 @@ npm install ai @ai-sdk/openai-compatible
 ### 6.2 分析输出 schema（`lib/ai/schema.ts`）
 
 字段（camelCase，映射 snake_case 列）：
+
 - `summary: string`
 - `sentimentScore: number`（-1..1）
 - `sentimentLabel: "positive" | "neutral" | "negative"`
@@ -102,7 +105,8 @@ npm install ai @ai-sdk/openai-compatible
 ### 6.4 分析流水线（`lib/ai/analyze.ts`）
 
 1. `createServiceRoleClient()`（server-only）
-2. 加载待分析文章：`articles` LEFT JOIN `article_analyses`，条件 `article_analyses.id is null`（supabase-js 用 `.is("article_analyses.id", null)`，**不要**用 `.eq('foreignTable.column', ...)`），带出 `title / raw_text / published_at / sources(name)`
+<!-- 2. 加载待分析文章：`articles` LEFT JOIN `article_analyses`，条件 `article_analyses.id is null`（supabase-js 用 `.is("article_analyses.id", null)`，**不要**用 `.eq('foreignTable.column', ...)`），带出 `title / raw_text / published_at / sources(name)` -->
+2. 加载待分析文章：`articles` 嵌入选择 `article_analyses(id)`，带出 `title / raw_text / published_at / sources(name)`；**不要**在关联表列上加过滤（`.eq()` / `.is()` 均不可），改为在 JavaScript 中筛选“无 `article_analyses` 关联行”的文章
 3. 应用 `articleIds` / `limit` 过滤（缺省 = 全部待分析）
 4. 按 `ANALYSIS_BATCH_SIZE` 分批（默认 5），批间串行、批内串行
 5. 每篇文章：

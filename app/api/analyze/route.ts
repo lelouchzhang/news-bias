@@ -39,12 +39,9 @@ export async function POST(request: Request) {
     const summary = await runAnalysisPipeline(parsed.data);
     return Response.json({ summary });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    // const message = error instanceof Error ? error.message : String(error);
     console.error("[analyze] Analysis run failed:", error);
-    return Response.json(
-      { error: "Analysis run failed", message },
-      { status: 500 },
-    );
+    return Response.json({ error: "Analysis run failed" }, { status: 500 });
   }
 }
 
