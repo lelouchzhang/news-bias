@@ -1,10 +1,10 @@
 import { Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { BiasDistribution as BiasDistributionData } from "@/lib/article/mock-article-details";
 
 interface BiasDistributionProps {
-  distribution: BiasDistributionData;
-  sourceCount: number;
+  left: number;
+  center: number;
+  right: number;
 }
 
 const segments = [
@@ -26,14 +26,11 @@ const segments = [
 ] as const;
 
 export function BiasDistribution({
-  distribution,
-  sourceCount,
+  left,
+  center,
+  right,
 }: BiasDistributionProps) {
-  const values = [
-    distribution.left,
-    distribution.center,
-    distribution.right,
-  ];
+  const values = [left, center, right];
 
   return (
     <section className="rounded-lg border border-border bg-bg-primary p-5">
@@ -50,7 +47,7 @@ export function BiasDistribution({
       <div
         className="mt-3 flex h-8 w-full overflow-hidden rounded-md"
         role="img"
-        aria-label={`Bias distribution: Left ${distribution.left}%, Center ${distribution.center}%, Right ${distribution.right}%`}
+        aria-label={`Bias distribution: Left ${left}%, Center ${center}%, Right ${right}%`}
       >
         {segments.map((segment, index) => (
           <div
@@ -72,9 +69,6 @@ export function BiasDistribution({
           </div>
         ))}
       </div>
-      <p className="mt-2 text-caption text-text-secondary">
-        {sourceCount} sources
-      </p>
     </section>
   );
 }

@@ -142,7 +142,7 @@ Use:
 - Oxylabs Scheduler
 - Cheerio
 - Vercel AI SDK
-- Deepseek provider
+- qwen3.7-plus（OpenAI 兼容 provider）
 - Zod
 - Tailwind CSS
 - shadcn/ui
@@ -571,6 +571,8 @@ AI 分析必须处理缺少分析的有效文章，通过下文中必做行为�
 
 AI 分析必须通过 POST /api/analyze 触发。
 
+分析模型默认使用 qwen3.7-plus（OpenAI 兼容协议）；模型名与密钥分别通过 ANALYSIS_MODEL_NAME / ANALYSIS_API_KEY 配置，可选 ANALYSIS_BASE_URL 覆盖端点（默认千问 AI 平台 https://dashscope.aliyuncs.com/compatible-mode/v1）。
+
 请求必须包含 x-biasly-admin-secret 请求头。
 
 默认行为应处理所有待处理有效文章。
@@ -733,7 +735,9 @@ NEXT_PUBLIC_SUPABASE_URL Supabase 项目 URL 客户端 + 服务端
 NEXT_PUBLIC_SUPABASE_ANON_KEY Supabase 匿名密钥 客户端 + 服务端
 SUPABASE_SERVICE_ROLE_KEY 用于写入和流水线读取的服务角色数据库访问密钥 仅服务端
 OXY_WSA_USERNAME / OXY_WSA_PASSWORD Oxylabs Web Scraper API 与调度器认证 仅服务端
-OPENAI_API_KEY AI 分析与 text-embedding-3-small 仅服务端
+ANALYSIS_MODEL_NAME AI 分析模型名（qwen3.7-plus） 仅服务端
+ANALYSIS_API_KEY AI 分析（qwen3.7-plus）密钥 仅服务端
+ANALYSIS_BASE_URL 可选；AI 分析 OpenAI 兼容端点（缺省千问 AI 平台） 仅服务端
 BIASLY_ADMIN_SECRET 操作路由上 x-biasly-admin-secret 所需的共享密钥（第 15 节） 仅服务端
 ANALYSIS_BATCH_SIZE 可选；每批次分析的文章数量（默认 5） 仅服务端
 CRON_SECRET 保护 GET /api/cron/pipeline；由 Vercel 注入，不在 .env.local 中（第 18 节） 仅服务端

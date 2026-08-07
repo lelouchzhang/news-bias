@@ -1,8 +1,9 @@
 import { Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { AiSummary } from "@/lib/article/mock-article-details";
+import { Chip } from "@/components/ui/chip";
+import type { AiSummaryView } from "@/lib/article/types";
 
-export function AiSummaryCard({ summary }: { summary: AiSummary }) {
+export function AiSummaryCard({ summary }: { summary: AiSummaryView }) {
   return (
     <section className="rounded-lg border border-border bg-bg-primary p-5">
       <div className="flex items-center gap-1.5">
@@ -16,20 +17,29 @@ export function AiSummaryCard({ summary }: { summary: AiSummary }) {
         />
       </div>
       <p className="mt-1 text-caption text-text-secondary">
-        Generated {summary.generatedAt} · {summary.readMinutes} min read
+        Generated {summary.generatedAt}
       </p>
 
-      <ul className="mt-4 space-y-3">
-        {summary.points.map((point, index) => (
-          <li key={index} className="flex gap-2.5 text-body-md text-text-primary">
-            <span
-              aria-hidden
-              className="mt-2 size-1.5 shrink-0 rounded-full bg-text-primary"
-            />
-            {point}
-          </li>
-        ))}
-      </ul>
+      <p className="mt-4 text-body-md text-text-primary">{summary.summary}</p>
+
+      {summary.loadedTerms.length > 0 ? (
+        <div className="mt-5">
+          <p className="text-caption font-medium uppercase tracking-wide text-text-secondary">
+            Loaded Terms
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {summary.loadedTerms.map((term) => (
+              <Chip
+                key={term}
+                withPlus={false}
+                className="px-3 py-1 text-caption"
+              >
+                {term}
+              </Chip>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <p className="mt-4 text-caption text-text-secondary">
         {summary.disclaimer}

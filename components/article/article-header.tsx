@@ -1,27 +1,31 @@
 import { Bookmark, MoreHorizontal, Share2 } from "lucide-react";
-import type { ArticleMeta } from "@/lib/article/mock-article-details";
+
+interface ArticleHeaderProps {
+  title: string;
+  sourceName: string;
+  publishedAt: string;
+  readMinutes: number;
+}
 
 const actions = [
   { label: "Save", Icon: Bookmark },
   { label: "Share", Icon: Share2 },
 ] as const;
 
-export function ArticleHeader({ article }: { article: ArticleMeta }) {
+export function ArticleHeader({
+  title,
+  sourceName,
+  publishedAt,
+  readMinutes,
+}: ArticleHeaderProps) {
   return (
     <header>
-      <p className="text-caption font-medium uppercase tracking-wide text-text-secondary">
-        {article.category} · {article.region}
-      </p>
-      <h1 className="mt-3 text-2xl font-bold leading-tight text-text-primary md:text-3xl">
-        {article.title}
+      <h1 className="text-2xl font-bold leading-tight text-text-primary md:text-3xl">
+        {title}
       </h1>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
         <p className="text-body-sm text-text-secondary">
-          By{" "}
-          <span className="font-medium text-text-primary">
-            {article.author}
-          </span>{" "}
-          | {article.publishedAt} | {article.readMinutes} min read
+          {sourceName} | {publishedAt} | {readMinutes} min read
         </p>
         <div className="flex items-center gap-1">
           {actions.map(({ label, Icon }) => (
