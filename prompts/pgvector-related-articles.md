@@ -119,9 +119,9 @@
 2. `npm run dev`，观察终端 `[analyze]` 日志。
 3. 分析并生成 embedding：
    ```bash
-   curl -X POST http://localhost:3000/api/analyze ^
-     -H "Content-Type: application/json" ^
-     -H "x-biasly-admin-secret: <你的值>" ^
+   curl.exe -X POST http://localhost:3000/api/analyze `
+     -H "Content-Type: application/json" `
+     -H "x-biasly-admin-secret: <你的值>" `
      -d "{}"
    ```
    预期：日志显示每篇分析 + embedding 生成成功，摘要含 `embeddingsGenerated`。

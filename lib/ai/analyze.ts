@@ -53,7 +53,6 @@ function getBatchSize(): number {
 function getEmbeddingModelName(): string {
   return (
     process.env.EMBEDDING_MODEL_NAME?.trim() ||
-    process.env.MODEL_NAME?.trim() ||
     DEFAULT_EMBEDDING_MODEL
   );
 }

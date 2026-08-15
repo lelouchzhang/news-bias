@@ -45,12 +45,11 @@ export interface AnalysisRunSummary {
   failed: number;
   embeddingsGenerated: number;
   backfilled: number;
-  failuresByReason: Record<string, number>;
+  failuresByReason: Partial<Record<AnalysisFailureReason, number>>;
   totalDurationMs: number;
   model: string;
   embeddingModel: string;
 }
-
 export interface AnalyzeOptions {
   /** 限定分析的文章 id；缺省为全部待分析文章。 */
   articleIds?: string[];
