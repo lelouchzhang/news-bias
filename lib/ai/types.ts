@@ -7,6 +7,11 @@ export interface PendingArticle {
   sourceName: string;
   publishedAt: string;
   rawText: string;
+  /**
+   * 已存在 analysis 行的 id（回填场景：行已存在但 embedding 为空）。
+   * 为 null/undefined 表示需跑完整分析（无 analysis 行）。
+   */
+  analysisId?: string | null;
 }
 
 /** 已通过 Zod 校验并映射到数据库列的分析结果。 */
@@ -27,7 +32,9 @@ export interface AnalysisResult {
 export type AnalysisFailureReason =
   | "analysis_failed"
   | "insert_failed"
-  | "analyzed_at_failed";
+  | "analyzed_at_failed"
+  | "embedding_failed"
+  | "embedding_dimension_mismatch";
 
 /** 分析运行摘要对象（§19 必需行为 9）。 */
 export interface AnalysisRunSummary {
@@ -36,11 +43,13 @@ export interface AnalysisRunSummary {
   articlesAnalyzed: number;
   skipped: number;
   failed: number;
-  failuresByReason: Record<string, number>;
+  embeddingsGenerated: number;
+  backfilled: number;
+  failuresByReason: Partial<Record<AnalysisFailureReason, number>>;
   totalDurationMs: number;
   model: string;
+  embeddingModel: string;
 }
-
 export interface AnalyzeOptions {
   /** 限定分析的文章 id；缺省为全部待分析文章。 */
   articleIds?: string[];

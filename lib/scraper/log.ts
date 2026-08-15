@@ -6,7 +6,7 @@ type ServiceClient = SupabaseClient<Database>;
 type LogLevel = "info" | "warn" | "error";
 
 /**
- * 双写日志：控制台 + logs 表（搂9 run logging）。
+ * 双写日志：控制台 + logs 表（session 9 run logging）。
  * logs 表写入失败不中断流水线，仅记录警告。
  */
 export async function writeLog(
@@ -27,7 +27,8 @@ export async function writeLog(
     await supabase.from("logs").insert({
       level,
       message,
-      context: (context ?? {}) as Database["public"]["Tables"]["logs"]["Insert"]["context"],
+      context: (context ??
+        {}) as Database["public"]["Tables"]["logs"]["Insert"]["context"],
     });
   } catch (error) {
     console.warn(

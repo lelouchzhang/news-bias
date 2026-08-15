@@ -54,7 +54,7 @@ export function isSameSite(candidateUrl: string, listingUrl: string): boolean {
   return stripWww(candidateHost) === stripWww(listingHost);
 }
 
-/** 路径中任意一段命中 non-article reject list（搂9/搂11）。 */
+/** 路径中任意一段命中 non-article reject list（session 9/session 11）。 */
 function hasRejectedPathSegment(pathname: string): boolean {
   const segments = pathname.split("/").filter(Boolean);
   return segments.some((segment) =>
@@ -63,7 +63,7 @@ function hasRejectedPathSegment(pathname: string): boolean {
 }
 
 /**
- * 候选 URL 过滤（搂12）：看起来像真实文章详情页才保留。
+ * 候选 URL 过滤（session 12）：看起来像真实文章详情页才保留。
  * 从严：URL 路径可疑且不确定时直接拒绝。
  */
 export function looksLikeArticleUrl(url: string): boolean {
@@ -92,9 +92,12 @@ export function looksLikeArticleUrl(url: string): boolean {
     return false;
   }
 
-  // 纯视频页（搂9 reject list）：即使含数字 ID 也拒绝
+  // 纯视频页（session 9 reject list）：即使含数字 ID 也拒绝
   if (
-    segments.some((segment) => segment.toLowerCase() === "video" || segment.toLowerCase() === "videos")
+    segments.some(
+      (segment) =>
+        segment.toLowerCase() === "video" || segment.toLowerCase() === "videos",
+    )
   ) {
     return false;
   }
@@ -105,7 +108,7 @@ export function looksLikeArticleUrl(url: string): boolean {
     return false;
   }
 
-  // non-article reject list（搂9）
+  // non-article reject list（session 9）
   if (hasRejectedPathSegment(pathname)) {
     return false;
   }
@@ -128,7 +131,7 @@ export function looksLikeArticleUrl(url: string): boolean {
     return true;
   }
 
-  // 多段路径 + 尾段为长标题 slug（搂12 从严）：
+  // 多段路径 + 尾段为长标题 slug（session 12 从严）：
   // 真实文章 slug 通常 >=30 字符且含 3+ 连字符（如 Fox/Reuters/Guardian），
   // 复合栏目名（如 healthcare-pharmaceuticals）只有 1 个连字符，予以拒绝。
   const lastSegmentLength = Array.from(lastSegment).length;

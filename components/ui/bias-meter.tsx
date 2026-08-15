@@ -8,7 +8,7 @@ export interface BiasMeterProps {
   /** Right bias percentage (0-100). */
   right?: number;
   /**
-   * "detailed" renders segment labels below the bar plus a 0/50/100 scale.
+   * "detailed" renders segment labels below the bar plus a 0/50/100 scale. 刻度模式用于展示页
    * "segmented" renders short labels inside each colored segment (news card style).
    */
   variant?: "detailed" | "segmented";

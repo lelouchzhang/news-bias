@@ -1,12 +1,17 @@
 -- ============================================================================
--- biasly Supabase schema（AGENTS.md §7 / §9 / §18 / §19）
+-- biasly Supabase schema（AGENTS.md §7 / §9 / §18 / §19 / §20）
 -- 说明：
 --   1. 2026-04 起 Supabase 新建表不再自动暴露给 Data API，必须显式 GRANT。
 --   2. 先启用 RLS，再创建 policy，最后 GRANT（官方推荐顺序）。
 --   3. 字段变更时必须同步更新 lib/supabase/types.ts（AGENTS.md §7）。
---   4. article_analyses 暂不含 embedding 列；pgvector（§20）启用后再加入。
+--   4. article_analyses 含 embedding vector(1024) 列（§20 pgvector 已启用）。
 -- 执行位置：Supabase Dashboard → SQL Editor（可重复执行，幂等）。
 -- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- pgvector 扩展（AGENTS.md §20）：用于「相关文章」余弦相似度检索
+-- ----------------------------------------------------------------------------
+create extension if not exists vector;
 
 -- ----------------------------------------------------------------------------
 -- sources：新闻源（抓取流程只加载 active = true 的源，§8/§9）
@@ -78,11 +83,20 @@ create table if not exists public.article_analyses (
   loaded_terms text[] not null default '{}',
   disclaimer text not null,
   model text not null,
+  embedding vector(1024),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint article_analyses_percentages_sum
     check (left_percentage + center_percentage + right_percentage = 100)
 );
+
+-- IVFFlat 余弦索引（AGENTS.md §20）：加速「相关文章」相似度检索。
+-- 注意：IVFFlat 有数据后再建索引效果最佳；空表建立亦可，但大规模回填后
+-- 建议 VACUUM + REINDEX。若数据量小可用 HNSW 替代（见注释）。
+create index if not exists article_analyses_embedding_idx
+  on public.article_analyses
+  using ivfflat (embedding vector_cosine_ops)
+  with (lists = 100);
 
 -- ----------------------------------------------------------------------------
 -- logs：流水线日志（仅服务端写入；不对客户端角色开放）
@@ -127,6 +141,50 @@ create table if not exists public.oxylabs_schedule_runs (
 );
 
 -- ----------------------------------------------------------------------------
+-- get_related_articles：余弦相似度相关文章（AGENTS.md §20）
+-- 返回与 p_article_id 语义最接近的最多 p_limit 篇文章（排除自身），
+-- 仅包含 embedding 非空且已分析的文章。SECURITY INVOKER，按调用者权限 + RLS。
+-- ----------------------------------------------------------------------------
+create or replace function public.get_related_articles(
+  p_article_id uuid,
+  p_embedding vector,
+  p_limit int default 5
+)
+returns table (
+  article_id uuid,
+  slug text,
+  title text,
+  image_url text,
+  published_at timestamptz,
+  source_id uuid,
+  source_name text,
+  similarity double precision
+)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select
+    a.id as article_id,
+    a.slug,
+    a.title,
+    a.image_url,
+    a.published_at,
+    a.source_id,
+    s.name as source_name,
+    1 - (aa.embedding <=> p_embedding) as similarity
+  from public.article_analyses aa
+  join public.articles a on a.id = aa.article_id
+  join public.sources s on s.id = a.source_id
+  where aa.embedding is not null
+    and aa.article_id <> p_article_id
+    and a.analyzed_at is not null
+  order by aa.embedding <=> p_embedding
+  limit p_limit;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- RLS：所有表启用；仅公开内容表对 anon/authenticated 开放 SELECT
 -- ----------------------------------------------------------------------------
 alter table public.sources enable row level security;
@@ -164,6 +222,9 @@ create policy "analyses_public_read_of_analyzed" on public.article_analyses
 -- GRANT：显式授予（2026-04 起新表不再自动暴露给 Data API）
 -- ----------------------------------------------------------------------------
 grant select on public.sources, public.articles, public.article_analyses
+  to anon, authenticated;
+
+grant execute on function public.get_related_articles(uuid, vector, int)
   to anon, authenticated;
 
 grant all on public.sources, public.articles, public.article_analyses,

@@ -120,6 +120,7 @@ export interface Database {
           loaded_terms: string[];
           disclaimer: string;
           model: string;
+          embedding: number[] | null;
           created_at: string;
           updated_at: string;
         };
@@ -139,6 +140,7 @@ export interface Database {
           loaded_terms?: string[];
           disclaimer: string;
           model: string;
+          embedding?: number[] | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -158,6 +160,7 @@ export interface Database {
           loaded_terms?: string[];
           disclaimer?: string;
           model?: string;
+          embedding?: number[] | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -267,7 +270,25 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      get_related_articles: {
+        Args: {
+          p_article_id: string;
+          p_embedding: number[];
+          p_limit?: number;
+        };
+        Returns: {
+          article_id: string;
+          slug: string;
+          title: string;
+          image_url: string;
+          published_at: string;
+          source_id: string;
+          source_name: string;
+          similarity: number;
+        }[];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

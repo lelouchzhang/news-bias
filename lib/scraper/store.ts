@@ -8,7 +8,7 @@ import { slugifyTitle, slugifyTitleWithSuffix } from "@/lib/scraper/urls";
 type ServiceClient = SupabaseClient<Database>;
 
 /**
- * URL existence check（搂9）：分批查询（单次 .in() 不超过 15 个），
+ * URL existence check（session 9）：分批查询（单次 .in() 不超过 15 个），
  * 返回已存在的 original_url / canonical_url 集合。
  */
 export async function findExistingUrls(
@@ -57,7 +57,7 @@ function isUniqueViolation(code: string | undefined): boolean {
 }
 
 /**
- * 仅追加入库（搂10）。slug 唯一冲突时换后缀重试；
+ * 仅追加入库（session 10）。slug 唯一冲突时换后缀重试；
  * original_url / canonical_url 冲突视为重复并跳过。
  */
 export async function insertArticle(

@@ -6,12 +6,16 @@ import { ArticleHeader } from "@/components/article/article-header";
 import { ArticleHero } from "@/components/article/article-hero";
 import { BiasAnalysisCard } from "@/components/article/bias-analysis-card";
 import { BiasDistribution } from "@/components/article/bias-distribution";
+import { RelatedArticles } from "@/components/article/related-articles";
 import { SubscribeBar } from "@/components/article/subscribe-bar";
 import { CategoryBar } from "@/components/home/category-bar";
 import { Footer } from "@/components/home/footer";
 import { Header } from "@/components/home/header";
 import { TopBar } from "@/components/home/top-bar";
-import { getArticleBySlug } from "@/lib/supabase/queries/articles";
+import {
+  getArticleBySlug,
+  getRelatedArticles,
+} from "@/lib/supabase/queries/articles";
 
 // 详情页同样请求时渲染，避免构建期预渲染查询数据库。
 export const dynamic = "force-dynamic";
@@ -45,6 +49,11 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   }
 
   const { analysis, paragraphs } = article;
+
+  // 相关文章仅在当前文章存在 embedding 时查询（§20）。
+  const relatedArticles = article.embedding
+    ? await getRelatedArticles(article.id, article.embedding)
+    : [];
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -100,6 +109,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
               />
             </aside>
           </div>
+
+          <RelatedArticles articles={relatedArticles} />
 
           <div className="mt-10">
             <SubscribeBar />

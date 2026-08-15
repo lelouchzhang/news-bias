@@ -2,7 +2,7 @@ import * as cheerio from "cheerio";
 import { isSameSite, normalizeUrl } from "@/lib/scraper/urls";
 
 /**
- * 仅从首页可见故事卡片提取候选文章链接（搂11）。
+ * 仅从首页可见故事卡片提取候选文章链接（session 11）。
  * 排除导航/菜单/页脚区域；只保留带图片或较长链接文本的锚点
  * （文章卡片形态，Guardian 等站点的卡片不是 h1-h4/article 结构），
  * 结果按规范化 URL 去重，非文章 URL 由 looksLikeArticleUrl 在后续步骤过滤。

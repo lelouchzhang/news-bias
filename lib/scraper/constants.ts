@@ -1,5 +1,5 @@
 /**
- * 抓取流水线集中限制值与非文章拒绝列表（AGENTS.md 搂9 / 搂16）。
+ * 抓取流水线集中限制值与非文章拒绝列表（AGENTS.md session 9 / session 16）。
  */
 
 export const DEFAULT_LIMIT_PER_SOURCE = 5;
@@ -16,7 +16,7 @@ export const DETAIL_FETCH_PER_SOURCE_MULTIPLIER = 3;
 export const OXYLABS_REQUEST_TIMEOUT_MS = 120_000;
 
 /**
- * Non-article reject list（搂9）：分类/栏目/话题/标签/作者/搜索/直播/视频/
+ * Non-article reject list（session 9）：分类/栏目/话题/标签/作者/搜索/直播/视频/
  * 播客/节目/游戏/产品/评测/购物/企业/支持/新闻通讯/订阅等路径段。
  * 变更时仅在此处更新。
  */

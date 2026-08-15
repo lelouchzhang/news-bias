@@ -31,7 +31,7 @@ interface OxylabsResponse {
 
 /**
  * 通过 Oxylabs Realtime API 抓取单个页面的 HTML。
- * 首页与详情页共用同一客户端（搂9）。
+ * 首页与详情页共用同一客户端（session 9）。
  */
 export async function fetchPageHtml(url: string): Promise<{
   html: string;
@@ -61,7 +61,9 @@ export async function fetchPageHtml(url: string): Promise<{
   const result = payload.results?.[0];
 
   if (!result) {
-    throw new Error(`Oxylabs returned no results: ${payload.error ?? "unknown error"}`);
+    throw new Error(
+      `Oxylabs returned no results: ${payload.error ?? "unknown error"}`,
+    );
   }
 
   if (result.status_code !== undefined && result.status_code !== 200) {
