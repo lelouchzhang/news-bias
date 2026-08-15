@@ -7,8 +7,17 @@ export const DEFAULT_ANALYSIS_MODEL = "qwen3.7-plus";
 export const DEFAULT_ANALYSIS_BASE_URL =
   "https://dashscope.aliyuncs.com/compatible-mode/v1";
 
-/** OpenAI 兼容 provider 名称，也用作 providerOptions 命名空间。 */
+/** 千问 AI 平台 OpenAI 兼容 provider 名称，也用作 providerOptions 命名空间。 */
 export const PROVIDER_NAME = "qwen";
+
+/** embedding 模型名称（千问 AI 平台 OpenAI 兼容协议，AGENTS.md §20）。 */
+export const DEFAULT_EMBEDDING_MODEL = "qwen3.7-text-embedding";
+
+/** embedding 向量维度（qwen3.7-text-embedding 实际输出 1024 维）。 */
+export const EMBEDDING_DIMENSIONS = 1024;
+
+/** embedding 输入文本最大字符数（标题 + 正文，截断）。 */
+export const EMBEDDING_MAX_CHARS = 8000;
 
 /** 传给模型的 raw_text 最大字符数。 */
 export const ANALYSIS_MAX_CHARS = 8000;

@@ -8,9 +8,11 @@ import type {
   ArticleCard,
   ArticleDetail,
   BiasLabel,
+  RelatedArticle,
   SentimentLabel,
 } from "@/lib/article/types";
 import { createServerDataClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 
 /**
  * 首页卡片数据：仅返回已分析文章（analyzed_at 非空），按发布时间倒序，最多 12 篇。
@@ -63,7 +65,7 @@ export const getArticleBySlug = cache(
     const { data, error } = await supabase
       .from("articles")
       .select(
-        "id, slug, title, image_url, published_at, raw_text, sources(name), article_analyses(summary, sentiment_score, sentiment_label, bias_label, left_percentage, center_percentage, right_percentage, confidence, framing_notes, loaded_terms, disclaimer, model, created_at)",
+        "id, slug, title, image_url, published_at, raw_text, sources(name), article_analyses(summary, sentiment_score, sentiment_label, bias_label, left_percentage, center_percentage, right_percentage, confidence, framing_notes, loaded_terms, disclaimer, model, embedding, created_at)",
       )
       .eq("slug", slug)
       .not("analyzed_at", "is", null)
@@ -87,6 +89,7 @@ export const getArticleBySlug = cache(
       publishedAt: formatDisplayDate(data.published_at),
       readMinutes: estimateReadMinutes(data.raw_text),
       paragraphs: splitParagraphs(data.raw_text),
+      embedding: analysis.embedding as number[] | null,
       analysis: {
         summary: analysis.summary,
         sentimentScore: analysis.sentiment_score,
@@ -105,3 +108,36 @@ export const getArticleBySlug = cache(
     };
   },
 );
+
+/**
+ * 相关文章（AGENTS.md §20）：按余弦相似度返回最多 limit 篇相似文章。
+ * 使用服务角色客户端调用 get_related_articles SQL 函数（向量 <=> 运算在 SQL 层）。
+ * 仅返回 embedding 非空、已分析且非当前文章的行。
+ */
+export async function getRelatedArticles(
+  articleId: string,
+  embedding: number[],
+  limit = 5,
+): Promise<RelatedArticle[]> {
+  const supabase = createServiceRoleClient();
+
+  const { data, error } = await supabase.rpc("get_related_articles", {
+    p_article_id: articleId,
+    p_embedding: embedding,
+    p_limit: limit,
+  });
+
+  if (error) {
+    throw new Error(`Failed to load related articles: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.article_id,
+    slug: row.slug,
+    title: row.title,
+    sourceName: row.source_name,
+    imageUrl: row.image_url,
+    publishedAt: formatDisplayDate(row.published_at),
+    similarity: row.similarity,
+  }));
+}

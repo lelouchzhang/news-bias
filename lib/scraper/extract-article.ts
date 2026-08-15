@@ -1,6 +1,10 @@
 import * as cheerio from "cheerio";
 import type { AnyNode } from "domhandler";
-import type { ParsedArticle, RejectionReason, SourceRow } from "@/lib/scraper/types";
+import type {
+  ParsedArticle,
+  RejectionReason,
+  SourceRow,
+} from "@/lib/scraper/types";
 import { normalizeUrl } from "@/lib/scraper/urls";
 
 export type ExtractArticleResult =
@@ -16,10 +20,7 @@ interface JsonLdArticle {
   url?: string;
 }
 
-type JsonLdImage =
-  | string
-  | { url?: string }
-  | Array<string | { url?: string }>;
+type JsonLdImage = string | { url?: string } | Array<string | { url?: string }>;
 
 function isJsonLdImageObject(
   image: JsonLdImage | undefined,
@@ -223,7 +224,7 @@ function pickContentRoot($: cheerio.CheerioAPI): cheerio.Cheerio<AnyNode> {
 }
 
 /**
- * 解析文章详情页（搂13）：标题/规范 URL/图片/发布日期/正文。
+ * 解析文章详情页（session 13）：标题/规范 URL/图片/发布日期/正文。
  * 缺失任一必需字段即返回拒绝原因。
  */
 export function extractArticle(

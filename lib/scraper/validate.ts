@@ -1,4 +1,8 @@
-import type { ParsedArticle, RejectionReason, SourceRow } from "@/lib/scraper/types";
+import type {
+  ParsedArticle,
+  RejectionReason,
+  SourceRow,
+} from "@/lib/scraper/types";
 
 const GENERIC_TITLES: readonly string[] = [
   "home",
@@ -47,7 +51,7 @@ function isSourceNameOnly(title: string, source: SourceRow): boolean {
 }
 
 /**
- * Article content gate（搂13）：标题特定、正文有意义、图片与日期必填。
+ * Article content gate（session 13）：标题特定、正文有意义、图片与日期必填。
  */
 export function validateArticle(
   article: ParsedArticle,
@@ -60,7 +64,10 @@ export function validateArticle(
   if (!article.title.trim()) {
     return { ok: false, reason: "no_title" };
   }
-  if (looksGenericTitle(article.title) || isSourceNameOnly(article.title, source)) {
+  if (
+    looksGenericTitle(article.title) ||
+    isSourceNameOnly(article.title, source)
+  ) {
     return { ok: false, reason: "generic_title" };
   }
 
@@ -78,20 +85,16 @@ export function validateArticle(
     .map((p) => p.trim())
     .filter((p) => p.replace(/\s/g, "").length >= 40);
 
-  const passes =
-    paragraphs.length >= 3 || meaningfulChars >= 900;
+  const passes = paragraphs.length >= 3 || meaningfulChars >= 900;
   if (!passes) {
     return { ok: false, reason: "no_body" };
   }
 
-  // 栏目页兜底：正文主要由短标题/摘要构成（段落多且都很短）时拒绝（搂13）
+  // 栏目页兜底：正文主要由短标题/摘要构成（段落多且都很短）时拒绝（session 13）
   const shortParagraphs = paragraphs.filter(
     (p) => p.replace(/\s/g, "").length < 120,
   ).length;
-  if (
-    paragraphs.length >= 10 &&
-    shortParagraphs / paragraphs.length >= 0.8
-  ) {
+  if (paragraphs.length >= 10 && shortParagraphs / paragraphs.length >= 0.8) {
     return { ok: false, reason: "no_body" };
   }
 

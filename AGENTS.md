@@ -210,7 +210,7 @@ Supabase是应用数据的唯一数据源。
 - 免责声明
 - 模型名称
 
-仅当在section 20启用`pgvector`后，将`embedding vector(1536)` 列加入`article_analyses`表中，不要在初始数据表结构中包含它。
+仅当在section 20启用`pgvector`后，将`embedding vector(1024)` 列加入`article_analyses`表中（qwen3.7-text-embedding 输出 1024 维），不要在初始数据表结构中包含它。
 
 当添加或更改下方字段中的任何一个时，更新supabase/schema.sql、lib/supabase/types.ts，并在测试前在Supabase Dashboard → SQL Editor中运行相应的ALTER SQL。
 
@@ -569,6 +569,8 @@ cron路由是内部仅用的，浏览器或用户不可调用。
 
 AI 分析必须处理缺少分析的有效文章，通过下文中必做行为列表里的待分析检查来检测——依据 article_analyses 的实际状态，而非仅依赖 analyzed_at 字段。
 
+<!-- 基于客观现实的分析而不是根据来源判断 -->
+
 AI 分析必须通过 POST /api/analyze 触发。
 
 分析模型默认使用 qwen3.7-plus（OpenAI 兼容协议）；模型名与密钥分别通过 ANALYSIS_MODEL_NAME / ANALYSIS_API_KEY 配置，可选 ANALYSIS_BASE_URL 覆盖端点（默认千问 AI 平台 https://dashscope.aliyuncs.com/compatible-mode/v1）。
@@ -687,7 +689,7 @@ AI 分析必须通过 POST /api/analyze 触发。
 
 本节将在 AI 分析功能正常工作后（第 19 节）实现。pgvector 将升级分析流水线，使其能同时生成嵌入向量，并驱动新闻详情页的“关联文章”功能。
 
-在 Supabase 控制台的“数据库扩展”中启用 pgvector。接着，通过 SQL 编辑器为 article_analyses 表添加 embedding vector(1536) 列，并为其创建 IVFFlat 余弦索引。更新 supabase/schema.sql、lib/supabase/types.ts，并在测试前执行对应的 ALTER SQL。
+在 Supabase 控制台的“数据库扩展”中启用 pgvector。接着，通过 SQL 编辑器为 article_analyses 表添加 embedding vector(1024) 列（qwen3.7-text-embedding 输出 1024 维），并为其创建 IVFFlat 余弦索引。更新 supabase/schema.sql、lib/supabase/types.ts，并在测试前执行对应的 ALTER SQL。
 
 更新 /api/analyze 路由，使其在为每篇文章调用现有分析接口的同时，也调用 OpenAI text-embedding-3-small 模型，并将结果存入 article_analyses.embedding。仅在分析结果和嵌入向量都保存成功后，才更新 analyzed_at。由于待分析检测使用了 LEFT JOIN 逻辑（见第 19 节），那些 article_analyses 行已存在但 embedding IS NULL 的文章，将在下次运行时自动被拾取以回填嵌入向量，而无需重新运行完整分析。
 
@@ -738,6 +740,9 @@ OXY_WSA_USERNAME / OXY_WSA_PASSWORD Oxylabs Web Scraper API 与调度器认证 �
 ANALYSIS_MODEL_NAME AI 分析模型名（qwen3.7-plus） 仅服务端
 ANALYSIS_API_KEY AI 分析（qwen3.7-plus）密钥 仅服务端
 ANALYSIS_BASE_URL 可选；AI 分析 OpenAI 兼容端点（缺省千问 AI 平台） 仅服务端
+EMBEDDING_MODEL_NAME AI 文本 embedding 模型名（qwen3.7-text-embedding） 仅服务端
+EMBEDDING_API_KEY AI 文本 embedding（qwen3.7-text-embedding）密钥 仅服务端
+EMBEDDING_BASE_URL 可选；embedding OpenAI 兼容端点（缺省复用 ANALYSIS_BASE_URL / 千问 AI 平台） 仅服务端
 BIASLY_ADMIN_SECRET 操作路由上 x-biasly-admin-secret 所需的共享密钥（第 15 节） 仅服务端
 ANALYSIS_BATCH_SIZE 可选；每批次分析的文章数量（默认 5） 仅服务端
 CRON_SECRET 保护 GET /api/cron/pipeline；由 Vercel 注入，不在 .env.local 中（第 18 节） 仅服务端

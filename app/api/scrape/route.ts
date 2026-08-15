@@ -6,12 +6,12 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const ScrapeRequestBody = z.object({
-  sourceIds: z.array(z.string().uuid()).optional(),
+  sourceIds: z.array(z.uuid()).optional(),
   limitPerSource: z.number().int().min(1).max(50).optional(),
 });
 
 /**
- * POST /api/scrape（搂14/搂15/搂16）
+ * POST /api/scrape（session 14/session 15/session 16）
  * 手动触发抓取-入库流水线，需要 x-biasly-admin-secret 请求头。
  */
 export async function POST(request: Request) {

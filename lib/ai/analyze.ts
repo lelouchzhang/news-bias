@@ -1,5 +1,5 @@
 import "server-only";
-import { generateText, type LanguageModel, Output } from "ai";
+import { embed, generateText, type EmbeddingModel, type LanguageModel, Output } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -10,6 +10,9 @@ import {
   DEFAULT_ANALYSIS_BASE_URL,
   DEFAULT_ANALYSIS_MODEL,
   DEFAULT_BATCH_SIZE,
+  DEFAULT_EMBEDDING_MODEL,
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MAX_CHARS,
   PROVIDER_NAME,
 } from "@/lib/ai/constants";
 import { writeLog } from "@/lib/ai/log";
@@ -47,6 +50,14 @@ function getBatchSize(): number {
   return Number.isInteger(parsed) && parsed >= 1 ? parsed : DEFAULT_BATCH_SIZE;
 }
 
+function getEmbeddingModelName(): string {
+  return (
+    process.env.EMBEDDING_MODEL_NAME?.trim() ||
+    process.env.MODEL_NAME?.trim() ||
+    DEFAULT_EMBEDDING_MODEL
+  );
+}
+
 /** 创建千问 AI 平台 OpenAI 兼容语言模型（qwen3.7-plus）。 */
 function createAnalysisModel(): LanguageModel {
   const apiKey = requireEnv("ANALYSIS_API_KEY");
@@ -61,9 +72,26 @@ function createAnalysisModel(): LanguageModel {
   return provider(getModelName());
 }
 
+/** 创建千问 AI 平台 OpenAI 兼容 embedding 模型（qwen3.7-text-embedding）。 */
+function createEmbeddingModel(): EmbeddingModel {
+  const apiKey = requireEnv("EMBEDDING_API_KEY");
+  const baseURL =
+    process.env.EMBEDDING_BASE_URL?.trim() ||
+    process.env.ANALYSIS_BASE_URL?.trim() ||
+    DEFAULT_ANALYSIS_BASE_URL;
+  const provider = createOpenAICompatible({
+    name: PROVIDER_NAME,
+    apiKey,
+    baseURL,
+  });
+  return provider.embeddingModel(getEmbeddingModelName());
+}
+
 /**
- * 加载待分析文章（§19 必需行为 1）。
- * 通过 article_analyses 关联行判断：无关联行即视为待分析；
+ * 加载待处理文章（§19 必需行为 1 + §20 回填）。
+ * 通过 article_analyses 关联行判断：
+ *   - 无关联行 → 待分析（需跑完整分析 + embedding）
+ *   - 有关联行但 embedding 为空 → 待回填（仅生成 embedding，不重跑分析）
  * 按 AGENTS.md §21，先不加过滤地获取关联数据，再在 JS 中筛选。
  */
 async function loadPendingArticles(
@@ -73,7 +101,7 @@ async function loadPendingArticles(
   const { data, error } = await supabase
     .from("articles")
     .select(
-      "id, title, raw_text, published_at, sources(name), article_analyses(id)",
+      "id, title, raw_text, published_at, sources(name), article_analyses(id, embedding)",
     )
     .order("published_at", { ascending: true });
 
@@ -82,13 +110,19 @@ async function loadPendingArticles(
   }
 
   let pending = (data ?? [])
-    .filter((row) => row.article_analyses === null)
+    .filter((row) => {
+      const analysis = row.article_analyses;
+      // 无 analysis 行 → 待分析；有行但 embedding 为空 → 待回填。
+      return analysis === null || analysis.embedding === null;
+    })
     .map((row) => ({
       id: row.id,
       title: row.title,
       sourceName: row.sources?.name ?? "Unknown source",
       publishedAt: row.published_at,
       rawText: row.raw_text,
+      // 已有 analysis 行时携带其 id，用于回填 update；否则为 null。
+      analysisId: row.article_analyses?.id ?? null,
     }));
 
   if (options.articleIds && options.articleIds.length > 0) {
@@ -209,9 +243,51 @@ async function analyzeOne(
   return { ok: false, error: lastError };
 }
 
+/** 构建 embedding 输入文本（标题 + 正文，截断至 EMBEDDING_MAX_CHARS）。 */
+function buildEmbeddingText(article: PendingArticle): string {
+  const text = `${article.title}\n\n${article.rawText}`;
+  return text.length > EMBEDDING_MAX_CHARS
+    ? text.slice(0, EMBEDDING_MAX_CHARS)
+    : text;
+}
+
 /**
- * 保存分析行并设置 analyzed_at。
- * 仅当 article_analyses 行成功写入后才设置 analyzed_at（§19）。
+ * 为文章生成 embedding（AGENTS.md §20）。
+ * 返回维度精确为 EMBEDDING_DIMENSIONS 的向量；维度不符返回失败。
+ */
+async function generateEmbedding(
+  article: PendingArticle,
+  model: EmbeddingModel,
+): Promise<
+  | { ok: true; embedding: number[] }
+  | { ok: false; error: string }
+> {
+  try {
+    const { embedding } = await embed({
+      model,
+      value: buildEmbeddingText(article),
+    });
+
+    if (!Array.isArray(embedding) || embedding.length !== EMBEDDING_DIMENSIONS) {
+      return {
+        ok: false,
+        error: `Embedding dimension mismatch: got ${
+          Array.isArray(embedding) ? embedding.length : "non-array"
+        }, expected ${EMBEDDING_DIMENSIONS}`,
+      };
+    }
+
+    return { ok: true, embedding };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * 插入分析行（不含 embedding；不含 analyzed_at）。
  * 唯一冲突视为已分析（跳过）。
  */
 async function storeAnalysis(
@@ -219,47 +295,90 @@ async function storeAnalysis(
   article: PendingArticle,
   result: AnalysisResult,
   modelName: string,
-): Promise<"saved" | "skipped" | "insert_failed" | "analyzed_at_failed"> {
+): Promise<
+  | { outcome: "saved"; analysisId: string }
+  | { outcome: "skipped" }
+  | { outcome: "insert_failed"; error: string }
+> {
   const { left, center, right } = roundPercentages(
     result.leftPercentage,
     result.centerPercentage,
     result.rightPercentage,
   );
 
-  const { error: insertError } = await supabase.from("article_analyses").insert({
-    article_id: article.id,
-    summary: result.summary,
-    sentiment_score: result.sentimentScore,
-    sentiment_label: result.sentimentLabel,
-    bias_label: result.biasLabel,
-    left_percentage: left,
-    center_percentage: center,
-    right_percentage: right,
-    confidence: result.confidence,
-    framing_notes: result.framingNotes,
-    loaded_terms: result.loadedTerms,
-    disclaimer: result.disclaimer,
-    model: modelName,
-  });
+  const { data, error: insertError } = await supabase
+    .from("article_analyses")
+    .insert({
+      article_id: article.id,
+      summary: result.summary,
+      sentiment_score: result.sentimentScore,
+      sentiment_label: result.sentimentLabel,
+      bias_label: result.biasLabel,
+      left_percentage: left,
+      center_percentage: center,
+      right_percentage: right,
+      confidence: result.confidence,
+      framing_notes: result.framingNotes,
+      loaded_terms: result.loadedTerms,
+      disclaimer: result.disclaimer,
+      model: modelName,
+    })
+    .select("id")
+    .single();
 
   if (insertError) {
     if (insertError.code === "23505") {
-      return "skipped";
+      return { outcome: "skipped" };
     }
-    return "insert_failed";
+    return { outcome: "insert_failed", error: insertError.message };
   }
 
-  const { error: updateError } = await supabase
-    .from("articles")
-    .update({ analyzed_at: new Date().toISOString() })
-    .eq("id", article.id);
-
-  return updateError ? "analyzed_at_failed" : "saved";
+  return { outcome: "saved", analysisId: data.id };
 }
 
 /**
- * AI 分析流水线（AGENTS.md §19）。
- * 默认处理全部待分析文章；支持 articleIds / limit；分批处理直至无待处理。
+ * 将生成的 embedding 写入 analysis 行。
+ * - 新文章：insert 后对 analysisId 执行 update 写入 embedding。
+ * - 回填：对已有 analysisId 执行 update 写入 embedding。
+ */
+async function storeEmbedding(
+  supabase: ServiceClient,
+  analysisId: string,
+  embedding: number[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await supabase
+    .from("article_analyses")
+    .update({ embedding })
+    .eq("id", analysisId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+/**
+ * 仅在分析与 embedding 都保存成功后设置 analyzed_at（§20）。
+ */
+async function markAnalyzed(
+  supabase: ServiceClient,
+  articleId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await supabase
+    .from("articles")
+    .update({ analyzed_at: new Date().toISOString() })
+    .eq("id", articleId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+/**
+ * AI 分析流水线（AGENTS.md §19 + §20）。
+ * 默认处理全部待处理文章（待分析 + 待回填 embedding）；
+ * 支持 articleIds / limit；分批处理直至无待处理。
  */
 export async function runAnalysisPipeline(
   options: AnalyzeOptions = {},
@@ -267,6 +386,7 @@ export async function runAnalysisPipeline(
   const startedAt = Date.now();
   const supabase = createServiceRoleClient();
   const modelName = getModelName();
+  const embeddingModelName = getEmbeddingModelName();
   const batchSize = getBatchSize();
 
   const summary: AnalysisRunSummary = {
@@ -275,9 +395,12 @@ export async function runAnalysisPipeline(
     articlesAnalyzed: 0,
     skipped: 0,
     failed: 0,
+    embeddingsGenerated: 0,
+    backfilled: 0,
     failuresByReason: {},
     totalDurationMs: 0,
     model: modelName,
+    embeddingModel: embeddingModelName,
   };
 
   await writeLog(supabase, "info", "Analysis run started", {
@@ -285,6 +408,7 @@ export async function runAnalysisPipeline(
     limit: options.limit ?? "all",
     batchSize,
     model: modelName,
+    embeddingModel: embeddingModelName,
   });
 
   let pending: PendingArticle[];
@@ -317,6 +441,7 @@ export async function runAnalysisPipeline(
   }
 
   const model = createAnalysisModel();
+  const embeddingModel = createEmbeddingModel();
   const batchCount = Math.ceil(pending.length / batchSize);
 
   for (let i = 0; i < pending.length; i += batchSize) {
@@ -327,6 +452,53 @@ export async function runAnalysisPipeline(
     );
 
     for (const article of batch) {
+      // 回填路径：已有 analysis 行（analysisId 非空），仅生成 embedding。
+      if (article.analysisId) {
+        const embedding = await generateEmbedding(article, embeddingModel);
+        if (!embedding.ok) {
+          summary.failed += 1;
+          summary.failuresByReason["embedding_failed"] =
+            (summary.failuresByReason["embedding_failed"] ?? 0) + 1;
+          console.error(
+            `[analyze] Failed to generate embedding for article ${article.id}: ${embedding.error}`,
+          );
+          continue;
+        }
+
+        const stored = await storeEmbedding(
+          supabase,
+          article.analysisId,
+          embedding.embedding,
+        );
+        if (!stored.ok) {
+          summary.failed += 1;
+          summary.failuresByReason["embedding_failed"] =
+            (summary.failuresByReason["embedding_failed"] ?? 0) + 1;
+          console.error(
+            `[analyze] Failed to store embedding for article ${article.id}: ${stored.error}`,
+          );
+          continue;
+        }
+
+        // 回填后确保 analyzed_at 已设置（覆盖过去 embedding 失败遗留）。
+        const marked = await markAnalyzed(supabase, article.id);
+        if (!marked.ok) {
+          summary.failed += 1;
+          summary.failuresByReason["analyzed_at_failed"] =
+            (summary.failuresByReason["analyzed_at_failed"] ?? 0) + 1;
+          console.error(
+            `[analyze] Failed to set analyzed_at for article ${article.id}: ${marked.error}`,
+          );
+          continue;
+        }
+
+        summary.embeddingsGenerated += 1;
+        summary.backfilled += 1;
+        console.log(`[analyze] Backfilled embedding for article: ${article.id}`);
+        continue;
+      }
+
+      // 新文章路径：完整分析 → 生成 embedding → 保存两者。
       const analysis = await analyzeOne(article, model);
 
       if (!analysis.ok) {
@@ -339,19 +511,64 @@ export async function runAnalysisPipeline(
         continue;
       }
 
-      const outcome = await storeAnalysis(supabase, article, analysis.result, modelName);
-      if (outcome === "saved") {
+      const embedding = await generateEmbedding(article, embeddingModel);
+      if (!embedding.ok) {
+        summary.failed += 1;
+        summary.failuresByReason["embedding_failed"] =
+          (summary.failuresByReason["embedding_failed"] ?? 0) + 1;
+        console.error(
+          `[analyze] Failed to generate embedding for article ${article.id}: ${embedding.error}`,
+        );
+        continue;
+      }
+
+      const storedAnalysis = await storeAnalysis(
+        supabase,
+        article,
+        analysis.result,
+        modelName,
+      );
+      if (storedAnalysis.outcome === "saved") {
+        const storedEmbedding = await storeEmbedding(
+          supabase,
+          storedAnalysis.analysisId,
+          embedding.embedding,
+        );
+        if (!storedEmbedding.ok) {
+          // analysis 已写入但 embedding 失败：不设置 analyzed_at；
+          // 下次运行将自动回填 embedding（§20）。
+          summary.failed += 1;
+          summary.failuresByReason["embedding_failed"] =
+            (summary.failuresByReason["embedding_failed"] ?? 0) + 1;
+          console.error(
+            `[analyze] Failed to store embedding for article ${article.id}: ${storedEmbedding.error}`,
+          );
+          continue;
+        }
+
+        const marked = await markAnalyzed(supabase, article.id);
+        if (!marked.ok) {
+          summary.failed += 1;
+          summary.failuresByReason["analyzed_at_failed"] =
+            (summary.failuresByReason["analyzed_at_failed"] ?? 0) + 1;
+          console.error(
+            `[analyze] Failed to set analyzed_at for article ${article.id}: ${marked.error}`,
+          );
+          continue;
+        }
+
         summary.articlesAnalyzed += 1;
+        summary.embeddingsGenerated += 1;
         console.log(`[analyze] Analyzed article: ${article.id}`);
-      } else if (outcome === "skipped") {
+      } else if (storedAnalysis.outcome === "skipped") {
         summary.skipped += 1;
         console.log(`[analyze] Skipped already-analyzed article: ${article.id}`);
       } else {
         summary.failed += 1;
-        summary.failuresByReason[outcome] =
-          (summary.failuresByReason[outcome] ?? 0) + 1;
+        summary.failuresByReason[storedAnalysis.outcome] =
+          (summary.failuresByReason[storedAnalysis.outcome] ?? 0) + 1;
         console.error(
-          `[analyze] Failed to store analysis for article ${article.id}: ${outcome}`,
+          `[analyze] Failed to store analysis for article ${article.id}: ${storedAnalysis.error}`,
         );
       }
     }
@@ -361,6 +578,7 @@ export async function runAnalysisPipeline(
       analyzed: summary.articlesAnalyzed,
       skipped: summary.skipped,
       failed: summary.failed,
+      backfilled: summary.backfilled,
     });
   }
 

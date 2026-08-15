@@ -29,6 +29,8 @@ export interface ArticleDetail {
   readMinutes: number;
   paragraphs: string[];
   analysis: ArticleAnalysis;
+  /** 当前文章的 embedding（可能为 null，无则隐藏相关文章）。 */
+  embedding: number[] | null;
 }
 
 export interface ArticleAnalysis {
@@ -53,6 +55,17 @@ export interface AiSummaryView {
   loadedTerms: string[];
   disclaimer: string;
   generatedAt: string;
+}
+
+/** 相关文章卡片（AGENTS.md §20，按余弦相似度返回）。 */
+export interface RelatedArticle {
+  id: string;
+  slug: string;
+  title: string;
+  sourceName: string;
+  imageUrl: string;
+  publishedAt: string;
+  similarity: number;
 }
 
 /** Bias Analysis 卡片输入。 */

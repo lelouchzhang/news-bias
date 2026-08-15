@@ -59,9 +59,8 @@ async function mapWithConcurrency<T, R>(
   }
 
   await Promise.all(
-    Array.from(
-      { length: Math.min(concurrency, items.length) },
-      () => runWorker(),
+    Array.from({ length: Math.min(concurrency, items.length) }, () =>
+      runWorker(),
     ),
   );
   return results;
@@ -95,7 +94,7 @@ async function loadSources(
 }
 
 /**
- * Scrape-to-insert 流水线（搂9 / 搂16）。
+ * Scrape-to-insert 流水线（session 9 / session 16）。
  * 手动抓取与调度器处理共用此编排；调度器仅替换首页 HTML 来源。
  */
 export async function runScrapePipeline(
@@ -130,7 +129,7 @@ export async function runScrapePipeline(
       .join(", ")}`,
   );
 
-  // 1. 首页抓取（搂9 步骤 2）
+  // 1. 首页抓取（session 9 步骤 2）
   await writeLog(supabase, "info", "Fetching homepages", {
     sources: sources.map((source) => source.name),
   });
@@ -146,7 +145,9 @@ export async function runScrapePipeline(
         return { source, html, error: null };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[scraper] Homepage fetch failed: ${source.name}: ${message}`);
+        console.warn(
+          `[scraper] Homepage fetch failed: ${source.name}: ${message}`,
+        );
         return { source, html: "", error: message };
       }
     },
@@ -155,13 +156,16 @@ export async function runScrapePipeline(
   const homepagePages: { source: SourceRow; html: string }[] = [];
   for (const result of homepageResults) {
     if (result.error) {
-      sourceErrors.push({ sourceName: result.source.name, error: result.error });
+      sourceErrors.push({
+        sourceName: result.source.name,
+        error: result.error,
+      });
       continue;
     }
     homepagePages.push({ source: result.source, html: result.html });
   }
 
-  // 2. 候选提取 + URL 过滤（搂9 步骤 3/4，搂11/搂12）
+  // 2. 候选提取 + URL 过滤（session 9 步骤 3/4，session 11/session 12）
   const candidateUrlsBySource = new Map<string, string[]>();
   for (const page of homepagePages) {
     const candidates = extractHomepageCandidates(
@@ -192,7 +196,7 @@ export async function runScrapePipeline(
     uniqueCandidates: uniqueCandidates.length,
   });
 
-  // 3. URL existence check（搂9 步骤 5；分批 ≤15）
+  // 3. URL existence check（session 9 步骤 5；分批 ≤15）
   let existingUrls: Set<string>;
   try {
     existingUrls = await findExistingUrls(supabase, uniqueCandidates);
@@ -202,9 +206,14 @@ export async function runScrapePipeline(
     summary.status = "failed";
     summary.totalDurationMs = Date.now() - startedAt;
     summary.sourceErrors = sourceErrors;
-    await writeLog(supabase, "error", "Scrape run failed during URL existence check", {
-      error: message,
-    });
+    await writeLog(
+      supabase,
+      "error",
+      "Scrape run failed during URL existence check",
+      {
+        error: message,
+      },
+    );
     return summary;
   }
 
@@ -222,7 +231,7 @@ export async function runScrapePipeline(
     duplicatesSkipped: summary.duplicatesSkipped,
   });
 
-  // 4. 详情抓取（搂9 步骤 6；并发受限）
+  // 4. 详情抓取（session 9 步骤 6；并发受限）
   const detailJobs: { source: SourceRow; url: string }[] = [];
   for (const page of homepagePages) {
     const candidatesForSource = newCandidatesBySource.get(page.source.id) ?? [];
@@ -264,7 +273,7 @@ export async function runScrapePipeline(
   }
   summary.detailsScraped = detailPages.length;
 
-  // 5. 解析 + 验证（搂9 步骤 7，搂13）
+  // 5. 解析 + 验证（session 9 步骤 7，session 13）
   const parsedBySource = new Map<string, ParsedArticle[]>();
   for (const page of detailPages) {
     const parsed = extractArticle(page.html, page.source, page.url);
@@ -288,7 +297,7 @@ export async function runScrapePipeline(
     parsedBySource.set(page.source.id, bySource);
   }
 
-  // 6. 仅追加写入（搂9 步骤 8，搂10；每源受 limitPerSource 限制）
+  // 6. 仅追加写入（session 9 步骤 8，session 10；每源受 limitPerSource 限制）
   for (const page of homepagePages) {
     const source = page.source;
     const articles = parsedBySource.get(source.id) ?? [];
@@ -301,7 +310,9 @@ export async function runScrapePipeline(
       if (result === "inserted") {
         insertedForSource += 1;
         summary.articlesInserted += 1;
-        console.log(`[scraper] Inserted article: ${article.title} (${source.name})`);
+        console.log(
+          `[scraper] Inserted article: ${article.title} (${source.name})`,
+        );
       } else if (result === "duplicate") {
         summary.duplicatesSkipped += 1;
       } else {
@@ -324,6 +335,9 @@ export async function runScrapePipeline(
   summary.totalDurationMs = Date.now() - startedAt;
 
   await writeLog(supabase, "info", "Scrape run finished", { summary });
-  console.log("[scraper] Scrape run summary:", JSON.stringify(summary, null, 2));
+  console.log(
+    "[scraper] Scrape run summary:",
+    JSON.stringify(summary, null, 2),
+  );
   return summary;
 }
